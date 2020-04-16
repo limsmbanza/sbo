@@ -59,7 +59,7 @@
                 <a class="dropdown-item" href="#"  onclick="event.preventDefault();
                                                      document.getElementById('logout-form').submit();">
 		  <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
-                                        @csrf
+                                    {{ csrf_field() }}
                                     </form>
                   <i class="mdi mdi-logout mr-2 text-primary"></i> Se déconnecter </a>
               </div>
@@ -161,7 +161,7 @@
               <a class="nav-link" href="#" onclick="event.preventDefault();
                                                      document.getElementById('logout-form').submit();" >
 		  <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
-                                        @csrf
+                                        {{ csrf_field() }}
                                     </form>
                 <i class="mdi mdi-power"></i>
               </a>

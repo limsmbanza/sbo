@@ -58,7 +58,7 @@
                             <div class="tab-pane fade show active" id="home" role="tabpanel" aria-labelledby="home-tab">
                                 <h3 class="register-heading">Ouvrir un compte</h3>
 				<form method="post" action="{{ route('register') }}">
-				@csrf
+				{{ csrf_field() }}
                                 <div class="row register-form">
                                     <div class="col-md-6">
                                         <div class="form-group">

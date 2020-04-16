@@ -9,7 +9,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Traits\Macroable;
 use PHPUnit\Framework\Assert as PHPUnit;
-use Illuminate\Foundation\Testing\Constraints\SeeInOrder;
 
 /**
  * @mixin \Illuminate\Http\Response
@@ -65,51 +64,6 @@ class TestResponse
     }
 
     /**
-     * Assert that the response has a 200 status code.
-     *
-     * @return $this
-     */
-    public function assertOk()
-    {
-        PHPUnit::assertTrue(
-            $this->isOk(),
-            'Response status code ['.$this->getStatusCode().'] does not match expected 200 status code.'
-        );
-
-        return $this;
-    }
-
-    /**
-     * Assert that the response has a not found status code.
-     *
-     * @return $this
-     */
-    public function assertNotFound()
-    {
-        PHPUnit::assertTrue(
-            $this->isNotFound(),
-            'Response status code ['.$this->getStatusCode().'] is not a not found status code.'
-        );
-
-        return $this;
-    }
-
-    /**
-     * Assert that the response has a forbidden status code.
-     *
-     * @return $this
-     */
-    public function assertForbidden()
-    {
-        PHPUnit::assertTrue(
-            $this->isForbidden(),
-            'Response status code ['.$this->getStatusCode().'] is not a forbidden status code.'
-        );
-
-        return $this;
-    }
-
-    /**
      * Assert that the response has the given status code.
      *
      * @param  int  $status
@@ -140,7 +94,7 @@ class TestResponse
         );
 
         if (! is_null($uri)) {
-            $this->assertLocation($uri);
+            PHPUnit::assertEquals(app('url')->to($uri), $this->headers->get('Location'));
         }
 
         return $this;
@@ -187,30 +141,16 @@ class TestResponse
     }
 
     /**
-     * Assert that the current location header matches the given URI.
-     *
-     * @param  string  $uri
-     * @return $this
-     */
-    public function assertLocation($uri)
-    {
-        PHPUnit::assertEquals(
-            app('url')->to($uri), app('url')->to($this->headers->get('Location'))
-        );
-
-        return $this;
-    }
-
-    /**
      * Asserts that the response contains the given cookie and equals the optional value.
      *
      * @param  string  $cookieName
      * @param  mixed  $value
+     * @param  bool  $unserialize
      * @return $this
      */
-    public function assertPlainCookie($cookieName, $value = null)
+    public function assertPlainCookie($cookieName, $value = null, $unserialize = false)
     {
-        $this->assertCookie($cookieName, $value, false);
+        $this->assertCookie($cookieName, $value, false, $unserialize);
 
         return $this;
     }
@@ -221,9 +161,10 @@ class TestResponse
      * @param  string  $cookieName
      * @param  mixed  $value
      * @param  bool  $encrypted
+     * @param  bool  $unserialize
      * @return $this
      */
-    public function assertCookie($cookieName, $value = null, $encrypted = true)
+    public function assertCookie($cookieName, $value = null, $encrypted = true, $unserialize = false)
     {
         PHPUnit::assertNotNull(
             $cookie = $this->getCookie($cookieName),
@@ -237,7 +178,7 @@ class TestResponse
         $cookieValue = $cookie->getValue();
 
         $actual = $encrypted
-            ? app('encrypter')->decrypt($cookieValue) : $cookieValue;
+            ? app('encrypter')->decrypt($cookieValue, $unserialize) : $cookieValue;
 
         PHPUnit::assertEquals(
             $value, $actual,
@@ -265,29 +206,6 @@ class TestResponse
         PHPUnit::assertTrue(
             $expiresAt->lessThan(Carbon::now()),
             "Cookie [{$cookieName}] is not expired, it expires at [{$expiresAt}]."
-        );
-
-        return $this;
-    }
-
-    /**
-     * Asserts that the response contains the given cookie and is not expired.
-     *
-     * @param  string  $cookieName
-     * @return $this
-     */
-    public function assertCookieNotExpired($cookieName)
-    {
-        PHPUnit::assertNotNull(
-            $cookie = $this->getCookie($cookieName),
-            "Cookie [{$cookieName}] not present on response."
-        );
-
-        $expiresAt = Carbon::createFromTimestamp($cookie->getExpiresTime());
-
-        PHPUnit::assertTrue(
-            $expiresAt->greaterThan(Carbon::now()),
-            "Cookie [{$cookieName}] is expired, it expired at [{$expiresAt}]."
         );
 
         return $this;
@@ -332,20 +250,7 @@ class TestResponse
      */
     public function assertSee($value)
     {
-        PHPUnit::assertContains((string) $value, $this->getContent());
-
-        return $this;
-    }
-
-    /**
-     * Assert that the given strings are contained in order within the response.
-     *
-     * @param  array  $values
-     * @return $this
-     */
-    public function assertSeeInOrder(array $values)
-    {
-        PHPUnit::assertThat($values, new SeeInOrder($this->getContent()));
+        PHPUnit::assertContains($value, $this->getContent());
 
         return $this;
     }
@@ -358,20 +263,7 @@ class TestResponse
      */
     public function assertSeeText($value)
     {
-        PHPUnit::assertContains((string) $value, strip_tags($this->getContent()));
-
-        return $this;
-    }
-
-    /**
-     * Assert that the given strings are contained in order within the response text.
-     *
-     * @param  array  $values
-     * @return $this
-     */
-    public function assertSeeTextInOrder(array $values)
-    {
-        PHPUnit::assertThat($values, new SeeInOrder(strip_tags($this->getContent())));
+        PHPUnit::assertContains($value, strip_tags($this->getContent()));
 
         return $this;
     }
@@ -384,7 +276,7 @@ class TestResponse
      */
     public function assertDontSee($value)
     {
-        PHPUnit::assertNotContains((string) $value, $this->getContent());
+        PHPUnit::assertNotContains($value, $this->getContent());
 
         return $this;
     }
@@ -397,7 +289,7 @@ class TestResponse
      */
     public function assertDontSeeText($value)
     {
-        PHPUnit::assertNotContains((string) $value, strip_tags($this->getContent()));
+        PHPUnit::assertNotContains($value, strip_tags($this->getContent()));
 
         return $this;
     }
@@ -625,10 +517,9 @@ class TestResponse
     /**
      * Validate and return the decoded response JSON.
      *
-     * @param  string|null  $key
-     * @return mixed
+     * @return array
      */
-    public function decodeResponseJson($key = null)
+    public function decodeResponseJson()
     {
         $decodedResponse = json_decode($this->getContent(), true);
 
@@ -640,18 +531,17 @@ class TestResponse
             }
         }
 
-        return data_get($decodedResponse, $key);
+        return $decodedResponse;
     }
 
     /**
      * Validate and return the decoded response JSON.
      *
-     * @param  string|null  $key
-     * @return mixed
+     * @return array
      */
-    public function json($key = null)
+    public function json()
     {
-        return $this->decodeResponseJson($key);
+        return $this->decodeResponseJson();
     }
 
     /**
@@ -762,7 +652,7 @@ class TestResponse
                 "Session is missing expected key [{$key}]."
             );
         } else {
-            PHPUnit::assertEquals($value, $this->session()->get($key));
+            PHPUnit::assertEquals($value, app('session.store')->get($key));
         }
 
         return $this;
@@ -801,7 +691,7 @@ class TestResponse
 
         $keys = (array) $keys;
 
-        $errors = $this->session()->get('errors')->getBag($errorBag);
+        $errors = app('session.store')->get('errors')->getBag($errorBag);
 
         foreach ($keys as $key => $value) {
             if (is_int($key)) {
@@ -810,18 +700,6 @@ class TestResponse
                 PHPUnit::assertContains($value, $errors->get($key, $format));
             }
         }
-
-        return $this;
-    }
-
-    /**
-     * Assert that the session has no errors.
-     *
-     * @return $this
-     */
-    public function assertSessionHasNoErrors()
-    {
-        $this->assertSessionMissing('errors');
 
         return $this;
     }

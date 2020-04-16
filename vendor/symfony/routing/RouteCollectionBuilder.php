@@ -25,18 +25,18 @@ class RouteCollectionBuilder
     /**
      * @var Route[]|RouteCollectionBuilder[]
      */
-    private $routes = array();
+    private $routes = [];
 
     private $loader;
-    private $defaults = array();
+    private $defaults = [];
     private $prefix;
     private $host;
     private $condition;
-    private $requirements = array();
-    private $options = array();
+    private $requirements = [];
+    private $options = [];
     private $schemes;
     private $methods;
-    private $resources = array();
+    private $resources = [];
 
     public function __construct(LoaderInterface $loader = null)
     {
@@ -46,7 +46,7 @@ class RouteCollectionBuilder
     /**
      * Import an external routing resource and returns the RouteCollectionBuilder.
      *
-     *  $routes->import('blog.yml', '/blog');
+     *     $routes->import('blog.yml', '/blog');
      *
      * @param mixed       $resource
      * @param string|null $prefix
@@ -58,7 +58,7 @@ class RouteCollectionBuilder
      */
     public function import($resource, $prefix = '/', $type = null)
     {
-        /** @var RouteCollection[] $collections */
+        /** @var RouteCollection[] $collection */
         $collections = $this->load($resource, $type);
 
         // create a builder from the RouteCollection
@@ -127,7 +127,6 @@ class RouteCollectionBuilder
     /**
      * Adds a Route object to the builder.
      *
-     * @param Route       $route
      * @param string|null $name
      *
      * @return $this
@@ -253,7 +252,7 @@ class RouteCollectionBuilder
      *
      * @return $this
      */
-    private function addResource(ResourceInterface $resource): self
+    private function addResource(ResourceInterface $resource)
     {
         $this->resources[] = $resource;
 
@@ -324,13 +323,15 @@ class RouteCollectionBuilder
 
     /**
      * Generates a route name based on details of this route.
+     *
+     * @return string
      */
-    private function generateRouteName(Route $route): string
+    private function generateRouteName(Route $route)
     {
         $methods = implode('_', $route->getMethods()).'_';
 
         $routeName = $methods.$route->getPath();
-        $routeName = str_replace(array('/', ':', '|', '-'), '_', $routeName);
+        $routeName = str_replace(['/', ':', '|', '-'], '_', $routeName);
         $routeName = preg_replace('/[^a-z0-9A-Z_.]+/', '', $routeName);
 
         // Collapse consecutive underscores down into a single underscore.
@@ -349,7 +350,7 @@ class RouteCollectionBuilder
      *
      * @throws FileLoaderLoadException If no loader is found
      */
-    private function load($resource, string $type = null): array
+    private function load($resource, $type = null)
     {
         if (null === $this->loader) {
             throw new \BadMethodCallException('Cannot import other routing resources: you must pass a LoaderInterface when constructing RouteCollectionBuilder.');
@@ -358,7 +359,7 @@ class RouteCollectionBuilder
         if ($this->loader->supports($resource, $type)) {
             $collections = $this->loader->load($resource, $type);
 
-            return is_array($collections) ? $collections : array($collections);
+            return \is_array($collections) ? $collections : [$collections];
         }
 
         if (null === $resolver = $this->loader->getResolver()) {
@@ -371,6 +372,6 @@ class RouteCollectionBuilder
 
         $collections = $loader->load($resource, $type);
 
-        return is_array($collections) ? $collections : array($collections);
+        return \is_array($collections) ? $collections : [$collections];
     }
 }

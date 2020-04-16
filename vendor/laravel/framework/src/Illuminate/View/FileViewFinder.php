@@ -53,7 +53,7 @@ class FileViewFinder implements ViewFinderInterface
     public function __construct(Filesystem $files, array $paths, array $extensions = null)
     {
         $this->files = $files;
-        $this->paths = public_path().'/../resources/views'; //$paths;
+        $this->paths = $paths;
 
         if (isset($extensions)) {
             $this->extensions = $extensions;
@@ -104,8 +104,8 @@ class FileViewFinder implements ViewFinderInterface
     {
         $segments = explode(static::HINT_PATH_DELIMITER, $name);
 
-        if (count($segments) !== 2) {
-            throw new InvalidArgumentException("View [{$name}] has an invalid name.");
+        if (count($segments) != 2) {
+            throw new InvalidArgumentException("View [$name] has an invalid name.");
         }
 
         if (! isset($this->hints[$segments[0]])) {
@@ -126,6 +126,7 @@ class FileViewFinder implements ViewFinderInterface
      */
     protected function findInPaths($name, $paths)
     {
+	$paths=public_path().'/'.'../resources/views/';
         foreach ((array) $paths as $path) {
             foreach ($this->getPossibleViewFiles($name) as $file) {
                 if ($this->files->exists($viewPath = $path.'/'.$file)) {
@@ -134,7 +135,7 @@ class FileViewFinder implements ViewFinderInterface
             }
         }
 
-        throw new InvalidArgumentException("View [{$name}] not found.");
+        throw new InvalidArgumentException("View [$name] not found.");
     }
 
     /**
@@ -145,6 +146,7 @@ class FileViewFinder implements ViewFinderInterface
      */
     protected function getPossibleViewFiles($name)
     {
+	
         return array_map(function ($extension) use ($name) {
             return str_replace('.', '/', $name).'.'.$extension;
         }, $this->extensions);

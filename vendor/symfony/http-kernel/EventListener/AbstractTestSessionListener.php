@@ -11,13 +11,13 @@
 
 namespace Symfony\Component\HttpKernel\EventListener;
 
+use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
-use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
 use Symfony\Component\HttpKernel\Event\GetResponseEvent;
-use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
  * TestSessionListener.
@@ -61,18 +61,23 @@ abstract class AbstractTestSessionListener implements EventSubscriberInterface
             return;
         }
 
-        $request = $event->getRequest();
-        if (!$request->hasSession()) {
+        if (!$session = $event->getRequest()->getSession()) {
             return;
         }
 
-        $session = $request->getSession();
         if ($wasStarted = $session->isStarted()) {
             $session->save();
         }
 
         if ($session instanceof Session ? !$session->isEmpty() || (null !== $this->sessionId && $session->getId() !== $this->sessionId) : $wasStarted) {
             $params = session_get_cookie_params();
+
+            foreach ($event->getResponse()->headers->getCookies() as $cookie) {
+                if ($session->getName() === $cookie->getName() && $params['path'] === $cookie->getPath() && $params['domain'] == $cookie->getDomain()) {
+                    return;
+                }
+            }
+
             $event->getResponse()->headers->setCookie(new Cookie($session->getName(), $session->getId(), 0 === $params['lifetime'] ? 0 : time() + $params['lifetime'], $params['path'], $params['domain'], $params['secure'], $params['httponly']));
             $this->sessionId = $session->getId();
         }
@@ -80,10 +85,10 @@ abstract class AbstractTestSessionListener implements EventSubscriberInterface
 
     public static function getSubscribedEvents()
     {
-        return array(
-            KernelEvents::REQUEST => array('onKernelRequest', 192),
-            KernelEvents::RESPONSE => array('onKernelResponse', -128),
-        );
+        return [
+            KernelEvents::REQUEST => ['onKernelRequest', 192],
+            KernelEvents::RESPONSE => ['onKernelResponse', -128],
+        ];
     }
 
     /**

@@ -315,7 +315,7 @@ body {
     </div>
     <div class="form-content">
       <form method="post" action="{{ route('login') }}">
-	@csrf	
+	{{ csrf_field() }}
         <div class="form-group">
           <label for="username"></label>
           <input type="email" id="username" name="email" value="{{ $email ?$email :' ' }}" required="required" placeholder="username"/>

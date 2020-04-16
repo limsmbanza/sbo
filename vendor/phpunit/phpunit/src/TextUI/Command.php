@@ -10,6 +10,7 @@
 
 namespace PHPUnit\TextUI;
 
+use File_Iterator_Facade;
 use PharIo\Manifest\ApplicationName;
 use PharIo\Manifest\Exception as ManifestException;
 use PharIo\Manifest\ManifestLoader;
@@ -21,21 +22,19 @@ use PHPUnit\Framework\TestSuite;
 use PHPUnit\Runner\PhptTestCase;
 use PHPUnit\Runner\StandardTestSuiteLoader;
 use PHPUnit\Runner\TestSuiteLoader;
-use PHPUnit\Runner\TestSuiteSorter;
 use PHPUnit\Runner\Version;
 use PHPUnit\Util\Configuration;
 use PHPUnit\Util\ConfigurationGenerator;
-use PHPUnit\Util\FileLoader;
+use PHPUnit\Util\Fileloader;
 use PHPUnit\Util\Filesystem;
 use PHPUnit\Util\Getopt;
 use PHPUnit\Util\Log\TeamCity;
 use PHPUnit\Util\Printer;
-use PHPUnit\Util\TestDox\CliTestDoxPrinter;
+use PHPUnit\Util\TestDox\TextResultPrinter;
 use PHPUnit\Util\TextTestListRenderer;
 use PHPUnit\Util\XmlTestListRenderer;
 use ReflectionClass;
-use SebastianBergmann\FileIterator\Facade as FileIteratorFacade;
-
+use SebastianBergmann\CodeCoverage\Report\PHP;
 use Throwable;
 
 /**
@@ -90,8 +89,6 @@ class Command
         'globals-backup'            => null,
         'group='                    => null,
         'help'                      => null,
-        'resolve-dependencies'      => null,
-        'ignore-dependencies'       => null,
         'include-path='             => null,
         'list-groups'               => null,
         'list-suites'               => null,
@@ -108,9 +105,6 @@ class Command
         'process-isolation'         => null,
         'repeat='                   => null,
         'dont-report-useless-tests' => null,
-        'random-order'              => null,
-        'random-order-seed='        => null,
-        'reverse-order'             => null,
         'reverse-list'              => null,
         'static-backup'             => null,
         'stderr'                    => null,
@@ -145,11 +139,9 @@ class Command
     private $versionStringPrinted = false;
 
     /**
-     * @throws \RuntimeException
-     * @throws \PHPUnit\Framework\Exception
-     * @throws \InvalidArgumentException
+     * @param bool $exit
      */
-    public static function main(bool $exit = true): int
+    public static function main($exit = true)
     {
         $command = new static;
 
@@ -157,12 +149,12 @@ class Command
     }
 
     /**
-     * @throws \RuntimeException
-     * @throws \ReflectionException
-     * @throws \InvalidArgumentException
-     * @throws Exception
+     * @param array $argv
+     * @param bool  $exit
+     *
+     * @return int
      */
-    public function run(array $argv, bool $exit = true): int
+    public function run(array $argv, $exit = true)
     {
         $this->handleArguments($argv);
 
@@ -222,8 +214,10 @@ class Command
 
     /**
      * Create a TestRunner, override in subclasses.
+     *
+     * @return TestRunner
      */
-    protected function createRunner(): TestRunner
+    protected function createRunner()
     {
         return new TestRunner($this->arguments['loader']);
     }
@@ -271,9 +265,9 @@ class Command
      * }
      * </code>
      *
-     * @throws Exception
+     * @param array $argv
      */
-    protected function handleArguments(array $argv): void
+    protected function handleArguments(array $argv)
     {
         try {
             $this->options = Getopt::getopt(
@@ -554,7 +548,7 @@ class Command
                     break;
 
                 case '--testdox':
-                    $this->arguments['printer'] = CliTestDoxPrinter::class;
+                    $this->arguments['printer'] = TextResultPrinter::class;
 
                     break;
 
@@ -695,36 +689,10 @@ class Command
 
                     break;
 
-                case '--random-order':
-                    $this->arguments['executionOrder'] = TestSuiteSorter::ORDER_RANDOMIZED;
-
-                    break;
-
-                case '--random-order-seed':
-                    $this->arguments['randomOrderSeed'] = (int) $option[1];
-
-                    break;
-
-                case '--resolve-dependencies':
-                    $this->arguments['resolveDependencies'] = true;
-
-                    break;
-
-                case '--ignore-dependencies':
-                    $this->arguments['resolveDependencies'] = false;
-
-                    break;
-
-                case '--reverse-order':
-                    $this->arguments['executionOrder'] = TestSuiteSorter::ORDER_REVERSED;
-
-                    break;
-
                 default:
                     $optionName = \str_replace('--', '', $option[0]);
 
                     $handler = null;
-
                     if (isset($this->longOptions[$optionName])) {
                         $handler = $this->longOptions[$optionName];
                     } elseif (isset($this->longOptions[$optionName . '='])) {
@@ -866,7 +834,7 @@ class Command
             }
 
             if (!isset($this->arguments['test'])) {
-                $testSuite = $configuration->getTestSuiteConfiguration($this->arguments['testsuite'] ?? '');
+                $testSuite = $configuration->getTestSuiteConfiguration($this->arguments['testsuite'] ?? null);
 
                 if ($testSuite !== null) {
                     $this->arguments['test'] = $testSuite;
@@ -896,8 +864,13 @@ class Command
 
     /**
      * Handles the loading of the PHPUnit\Runner\TestSuiteLoader implementation.
+     *
+     * @param string $loaderClass
+     * @param string $loaderFile
+     *
+     * @return TestSuiteLoader|null
      */
-    protected function handleLoader(string $loaderClass, string $loaderFile = ''): ?TestSuiteLoader
+    protected function handleLoader($loaderClass, $loaderFile = '')
     {
         if (!\class_exists($loaderClass, false)) {
             if ($loaderFile == '') {
@@ -923,7 +896,7 @@ class Command
         }
 
         if ($loaderClass == StandardTestSuiteLoader::class) {
-            return null;
+            return;
         }
 
         $this->exitWithErrorMessage(
@@ -932,16 +905,17 @@ class Command
                 $loaderClass
             )
         );
-
-        return null;
     }
 
     /**
      * Handles the loading of the PHPUnit\Util\Printer implementation.
      *
-     * @return null|Printer|string
+     * @param string $printerClass
+     * @param string $printerFile
+     *
+     * @return Printer|string|null
      */
-    protected function handlePrinter(string $printerClass, string $printerFile = '')
+    protected function handlePrinter($printerClass, $printerFile = '')
     {
         if (!\class_exists($printerClass, false)) {
             if ($printerFile == '') {
@@ -1008,17 +982,19 @@ class Command
 
     /**
      * Loads a bootstrap file.
+     *
+     * @param string $filename
      */
-    protected function handleBootstrap(string $filename): void
+    protected function handleBootstrap($filename)
     {
         try {
-            FileLoader::checkAndLoad($filename);
+            Fileloader::checkAndLoad($filename);
         } catch (Exception $e) {
             $this->exitWithErrorMessage($e->getMessage());
         }
     }
 
-    protected function handleVersionCheck(): void
+    protected function handleVersionCheck()
     {
         $this->printVersionString();
 
@@ -1041,7 +1017,7 @@ class Command
     /**
      * Show the help message.
      */
-    protected function showHelp(): void
+    protected function showHelp()
     {
         $this->printVersionString();
 
@@ -1051,98 +1027,93 @@ Usage: phpunit [options] UnitTest [UnitTest.php]
 
 Code Coverage Options:
 
-  --coverage-clover <file>    Generate code coverage report in Clover XML format
-  --coverage-crap4j <file>    Generate code coverage report in Crap4J XML format
-  --coverage-html <dir>       Generate code coverage report in HTML format
-  --coverage-php <file>       Export PHP_CodeCoverage object to file
-  --coverage-text=<file>      Generate code coverage report in text format
-                              Default: Standard output
-  --coverage-xml <dir>        Generate code coverage report in PHPUnit XML format
-  --whitelist <dir>           Whitelist <dir> for code coverage analysis
-  --disable-coverage-ignore   Disable annotations for ignoring code coverage
+  --coverage-clover <file>    Generate code coverage report in Clover XML format.
+  --coverage-crap4j <file>    Generate code coverage report in Crap4J XML format.
+  --coverage-html <dir>       Generate code coverage report in HTML format.
+  --coverage-php <file>       Export PHP_CodeCoverage object to file.
+  --coverage-text=<file>      Generate code coverage report in text format.
+                              Default: Standard output.
+  --coverage-xml <dir>        Generate code coverage report in PHPUnit XML format.
+  --whitelist <dir>           Whitelist <dir> for code coverage analysis.
+  --disable-coverage-ignore   Disable annotations for ignoring code coverage.
+  --no-coverage               Ignore code coverage configuration.
 
 Logging Options:
 
-  --log-junit <file>          Log test execution in JUnit XML format to file
-  --log-teamcity <file>       Log test execution in TeamCity format to file
-  --testdox-html <file>       Write agile documentation in HTML format to file
-  --testdox-text <file>       Write agile documentation in Text format to file
-  --testdox-xml <file>        Write agile documentation in XML format to file
+  --log-junit <file>          Log test execution in JUnit XML format to file.
+  --log-teamcity <file>       Log test execution in TeamCity format to file.
+  --testdox-html <file>       Write agile documentation in HTML format to file.
+  --testdox-text <file>       Write agile documentation in Text format to file.
+  --testdox-xml <file>        Write agile documentation in XML format to file.
   --reverse-list              Print defects in reverse order
 
 Test Selection Options:
 
-  --filter <pattern>          Filter which tests to run
-  --testsuite <name,...>      Filter which testsuite to run
-  --group ...                 Only runs tests from the specified group(s)
-  --exclude-group ...         Exclude tests from the specified group(s)
-  --list-groups               List available test groups
-  --list-suites               List available test suites
-  --list-tests                List available tests
-  --list-tests-xml <file>     List available tests in XML format
+  --filter <pattern>          Filter which tests to run.
+  --testsuite <name,...>      Filter which testsuite to run.
+  --group ...                 Only runs tests from the specified group(s).
+  --exclude-group ...         Exclude tests from the specified group(s).
+  --list-groups               List available test groups.
+  --list-suites               List available test suites.
+  --list-tests                List available tests.
+  --list-tests-xml <file>     List available tests in XML format.
   --test-suffix ...           Only search for test in files with specified
                               suffix(es). Default: Test.php,.phpt
 
 Test Execution Options:
 
-  --dont-report-useless-tests Do not report tests that do not test anything
-  --strict-coverage           Be strict about @covers annotation usage
+  --dont-report-useless-tests Do not report tests that do not test anything.
+  --strict-coverage           Be strict about @covers annotation usage.
   --strict-global-state       Be strict about changes to global state
-  --disallow-test-output      Be strict about output during tests
-  --disallow-resource-usage   Be strict about resource usage during small tests
-  --enforce-time-limit        Enforce time limit based on test size
-  --disallow-todo-tests       Disallow @todo-annotated tests
+  --disallow-test-output      Be strict about output during tests.
+  --disallow-resource-usage   Be strict about resource usage during small tests.
+  --enforce-time-limit        Enforce time limit based on test size.
+  --disallow-todo-tests       Disallow @todo-annotated tests.
 
-  --process-isolation         Run each test in a separate PHP process
-  --globals-backup            Backup and restore \$GLOBALS for each test
-  --static-backup             Backup and restore static attributes for each test
+  --process-isolation         Run each test in a separate PHP process.
+  --globals-backup            Backup and restore \$GLOBALS for each test.
+  --static-backup             Backup and restore static attributes for each test.
 
-  --colors=<flag>             Use colors in output ("never", "auto" or "always")
-  --columns <n>               Number of columns to use for progress output
-  --columns max               Use maximum number of columns for progress output
-  --stderr                    Write to STDERR instead of STDOUT
-  --stop-on-error             Stop execution upon first error
-  --stop-on-failure           Stop execution upon first error or failure
-  --stop-on-warning           Stop execution upon first warning
-  --stop-on-risky             Stop execution upon first risky test
-  --stop-on-skipped           Stop execution upon first skipped test
-  --stop-on-incomplete        Stop execution upon first incomplete test
-  --fail-on-warning           Treat tests with warnings as failures
-  --fail-on-risky             Treat risky tests as failures
-  -v|--verbose                Output more verbose information
-  --debug                     Display debugging information
+  --colors=<flag>             Use colors in output ("never", "auto" or "always").
+  --columns <n>               Number of columns to use for progress output.
+  --columns max               Use maximum number of columns for progress output.
+  --stderr                    Write to STDERR instead of STDOUT.
+  --stop-on-error             Stop execution upon first error.
+  --stop-on-failure           Stop execution upon first error or failure.
+  --stop-on-warning           Stop execution upon first warning.
+  --stop-on-risky             Stop execution upon first risky test.
+  --stop-on-skipped           Stop execution upon first skipped test.
+  --stop-on-incomplete        Stop execution upon first incomplete test.
+  --fail-on-warning           Treat tests with warnings as failures.
+  --fail-on-risky             Treat risky tests as failures.
+  -v|--verbose                Output more verbose information.
+  --debug                     Display debugging information.
 
-  --loader <loader>           TestSuiteLoader implementation to use
-  --repeat <times>            Runs the test(s) repeatedly
-  --teamcity                  Report test execution progress in TeamCity format
-  --testdox                   Report test execution progress in TestDox format
-  --testdox-group             Only include tests from the specified group(s)
-  --testdox-exclude-group     Exclude tests from the specified group(s)
-  --printer <printer>         TestListener implementation to use
-
-  --resolve-dependencies      Resolve dependencies between tests
-  --random-order              Run tests in random order
-  --random-order-seed=<N>     Use a specific random seed <N> for random order
-  --reverse-order             Run tests last-to-first
+  --loader <loader>           TestSuiteLoader implementation to use.
+  --repeat <times>            Runs the test(s) repeatedly.
+  --teamcity                  Report test execution progress in TeamCity format.
+  --testdox                   Report test execution progress in TestDox format.
+  --testdox-group             Only include tests from the specified group(s).
+  --testdox-exclude-group     Exclude tests from the specified group(s).
+  --printer <printer>         TestListener implementation to use.
 
 Configuration Options:
 
-  --bootstrap <file>          A "bootstrap" PHP file that is run before the tests
-  -c|--configuration <file>   Read configuration from XML file
-  --no-configuration          Ignore default configuration file (phpunit.xml)
-  --no-coverage               Ignore code coverage configuration
-  --no-logging                Ignore logging configuration
-  --no-extensions             Do not load PHPUnit extensions
-  --include-path <path(s)>    Prepend PHP's include_path with given path(s)
-  -d key[=value]              Sets a php.ini value
-  --generate-configuration    Generate configuration file with suggested settings
+  --bootstrap <file>          A "bootstrap" PHP file that is run before the tests.
+  -c|--configuration <file>   Read configuration from XML file.
+  --no-configuration          Ignore default configuration file (phpunit.xml).
+  --no-logging                Ignore logging configuration.
+  --no-extensions             Do not load PHPUnit extensions.
+  --include-path <path(s)>    Prepend PHP's include_path with given path(s).
+  -d key[=value]              Sets a php.ini value.
+  --generate-configuration    Generate configuration file with suggested settings.
 
 Miscellaneous Options:
 
-  -h|--help                   Prints this usage information
-  --version                   Prints the version and exits
-  --atleast-version <min>     Checks that version is greater than min and exits
-  --check-version             Check whether PHPUnit is the latest version
+  -h|--help                   Prints this usage information.
+  --version                   Prints the version and exits.
+  --atleast-version <min>     Checks that version is greater than min and exits.
+  --check-version             Check whether PHPUnit is the latest version.
 
 EOT;
     }
@@ -1150,11 +1121,11 @@ EOT;
     /**
      * Custom callback for test suite discovery.
      */
-    protected function handleCustomTestSuite(): void
+    protected function handleCustomTestSuite()
     {
     }
 
-    private function printVersionString(): void
+    private function printVersionString()
     {
         if ($this->versionStringPrinted) {
             return;
@@ -1165,7 +1136,10 @@ EOT;
         $this->versionStringPrinted = true;
     }
 
-    private function exitWithErrorMessage(string $message): void
+    /**
+     * @param string $message
+     */
+    private function exitWithErrorMessage($message)
     {
         $this->printVersionString();
 
@@ -1174,9 +1148,12 @@ EOT;
         exit(TestRunner::FAILURE_EXIT);
     }
 
-    private function handleExtensions(string $directory): void
+    /**
+     * @param string $directory
+     */
+    private function handleExtensions($directory)
     {
-        $facade = new FileIteratorFacade;
+        $facade = new File_Iterator_Facade;
 
         foreach ($facade->getFilesAsArray($directory, '.phar') as $file) {
             if (!\file_exists('phar://' . $file . '/manifest.xml')) {
