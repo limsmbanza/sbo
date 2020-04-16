@@ -43,7 +43,18 @@
                             <div class="col-md-6 offset-md-4">
                                 <div class="checkbox">
                                     <label>
-                                        <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}> {{ __('Remember Me') }}
+                                        <input type="checkbox" name="remember" {{ old('remember') ? 'checked' : '' }}> Se souvenir de moi
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+			
+                        <div class="form-group row">
+                            <div class="col-md-6 offset-md-4">
+                                <div class="checkbox">
+                                    <label>
+                                        <a href="{{ url('/register') }}">Vous ne disposez pas un compte?</a>
                                     </label>
                                 </div>
                             </div>

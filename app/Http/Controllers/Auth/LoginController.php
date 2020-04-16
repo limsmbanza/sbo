@@ -36,4 +36,14 @@ class LoginController extends Controller
     {
         $this->middleware('guest')->except('logout');
     }
+
+
+   public function showLoginForm()
+   {	
+	$email = session('email')?? ' ';
+	$message= session('message')?? ' ';	
+
+	return view('frontend.login',compact('email','message'));
+   }
 }
+

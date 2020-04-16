@@ -1,6 +1,7 @@
 <?php
-use App\ModelsOffer;
 use App\User;
+use Illuminate\Support\Facades\Auth;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -13,10 +14,17 @@ use App\User;
 */
 
 Route::get('/', function () {
-   $offers=ModelsOffer::all();
-   
+   return view('frontend.index');
+//   $offers=ModelsOffer::all();   
+   if(Auth::check())
+	return redirect('/home')->with('warning',"Veuillez avant tout vous deconnectez avant d'éffectuer cette action");	
    return view('index',compact('offers'));     
 
+});
+
+
+Route::get('/register',function(){
+	return view('frontend.register');
 });
 
 Route::get('offer/subscribe/{abbr}','OfferController@subscribe')->where(['abbr'=>'[a-z]+']);
