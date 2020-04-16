@@ -196,24 +196,25 @@
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="index.html">
-                <span class="menu-title" style="color:#fff;">Dashboard</span>
+              <a class="nav-link" href="{{ url('home') }}">
+                <span class="menu-title" style="color:#fff;">Tableau de bord</span>
                 <i class="mdi mdi-home menu-icon" style="color:#fff;" style="color:#fff;"></i>
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link" data-toggle="collapse" href="#ui-basic" aria-expanded="false" aria-controls="ui-basic">
-                <span class="menu-title" style="color:#fff;">Basic UI Elements</span>
+                <span class="menu-title" style="color:#fff;">Site d'exploition</span>
                 <i class="menu-arrow"></i>
                 <i class="mdi mdi-crosshairs-gps menu-icon" style="color:#fff;"></i>
               </a>
               <div class="collapse" id="ui-basic">
                 <ul class="nav flex-column sub-menu">
-                  <li class="nav-item"> <a class="nav-link" href="pages/ui-features/buttons.html" >Buttons</a></li>
-                  <li class="nav-item"> <a class="nav-link" href="pages/ui-features/typography.html" >Typography</a></li>
+                  <li class="nav-item"> <a class="nav-link" href="pages/ui-features/buttons.html" >Ajouter un site d'exploitation</a></li>
+                  <li class="nav-item"> <a class="nav-link" href="pages/ui-features/typography.html" >Voir tous les sites</a></li>
                 </ul>
               </div>
             </li>
+	    
             <li class="nav-item">
               <a class="nav-link" href="pages/icons/mdi.html">
                 <span class="menu-title" style="color:#fff;">Icons</span>
@@ -280,16 +281,7 @@
 
         <div class="main-panel">
           <div class="content-wrapper" style="background:#fff;">
-            <div class="row" id="proBanner">
-              <div class="col-12">
-                <span class="d-flex align-items-center purchase-popup">
-                  <p>Like what you see? Check out our premium version for more.</p>
-                  <a href="https://github.com/BootstrapDash/PurpleAdmin-Free-Admin-Template" target="_blank" class="btn ml-auto download-button">Download Free Version</a>
-                  <a href="https://www.bootstrapdash.com/product/purple-bootstrap-4-admin-template/" target="_blank" class="btn purchase-button">Upgrade To Pro</a>
-                  <i class="mdi mdi-close" id="bannerClose"></i>
-                </span>
-              </div>
-            </div>
+        
             <div class="page-header">
               <h3 class="page-title">
                 <span class="page-title-icon bg-gradient-primary text-white mr-2">
