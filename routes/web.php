@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 |
 */
 
+
+
 Route::get('/', function () {
    return view('frontend.index');
 //   $offers=ModelsOffer::all();   
@@ -44,7 +46,7 @@ Route::get('/verify/{token}',function(){
 });
 
 Route::middleware(['auth'])->group(function(){
-	Route::resource('departement','DepartementController');
-        Route::resource('subdepartement','SubDepartementController');
-	Route::resource('stakeholder','StakeHolderController');  		
+	Route::resource('agence','AgenceController');
+	Route::resource('exercice','ExerciceGestionController');
+          		
 });
